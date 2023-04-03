@@ -23,8 +23,8 @@ class CloudflareEmailClient(private val auth: CloudflareEmailAuth) : AutoCloseab
       applyAuthentication()
     }.body()
 
-  private suspend fun getCatchAllRule(zone: String): ApiCallResult<RoutingRule> =
-    httpClient.get("${baseUrl}/zones/${zone}/email/routing/catch_all") {
+  private suspend fun listDestinationAddresses(account: String, page: Int): ApiCallResult<List<DestinationAddress>> =
+    httpClient.get("${baseUrl}/accounts/${account}/email/routing/addresses?page=${page}") {
       applyAuthentication()
     }.body()
 
@@ -46,6 +46,12 @@ class CloudflareEmailClient(private val auth: CloudflareEmailAuth) : AutoCloseab
       applyAuthentication()
     }.body()
 
+  suspend fun addDestinationAddress(account: String, address: DestinationAddress): ApiCallResult<DestinationAddress> =
+    httpClient.post("${baseUrl}/accounts/${account}/email/routing/addresses") {
+      applyAuthentication()
+      setBody(Json.encodeToString(DestinationAddress.serializer(), address))
+    }.body()
+
   suspend fun listRoutingRules(zone: String): List<RoutingRule> {
     val rules = mutableListOf<RoutingRule>()
     var page = 1
@@ -53,6 +59,25 @@ class CloudflareEmailClient(private val auth: CloudflareEmailAuth) : AutoCloseab
       val result = listRoutingRules(zone, page)
       if (!result.success) {
         throw RuntimeException("Failed to fetch routing rules.")
+      }
+
+      if (result.result!!.isEmpty()) {
+        break
+      }
+
+      rules.addAll(result.result)
+      page++
+    }
+    return rules
+  }
+
+  suspend fun listDestinationAddresses(zone: String): List<DestinationAddress> {
+    val rules = mutableListOf<DestinationAddress>()
+    var page = 1
+    while (true) {
+      val result = listDestinationAddresses(zone, page)
+      if (!result.success) {
+        throw RuntimeException("Failed to fetch destination addresses.")
       }
 
       if (result.result!!.isEmpty()) {
@@ -106,6 +131,12 @@ class CloudflareEmailClient(private val auth: CloudflareEmailAuth) : AutoCloseab
     val type: String,
     val field: String? = null,
     val value: String? = null
+  )
+
+  @Serializable
+  data class DestinationAddress(
+    val verified: String? = null,
+    val email: String
   )
 
   @Serializable

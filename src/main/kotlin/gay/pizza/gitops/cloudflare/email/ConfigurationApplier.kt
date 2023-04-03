@@ -3,38 +3,11 @@ package gay.pizza.gitops.cloudflare.email
 class ConfigurationApplier(private val client: CloudflareEmailClient, private val config: Configuration) {
   suspend fun apply(dry: Boolean) {
     val existingRoutingRules = client.listRoutingRules(config.zone)
-    val generatedRoutingRules = config.forwards.map { (emailName, destination) ->
-      CloudflareEmailClient.RoutingRule(
-        enabled = true,
-        matchers = listOf(
-          CloudflareEmailClient.RoutingRuleMatcher(
-            type = "literal",
-            field = "to",
-            value = "${emailName}@${config.domain}"
-          )
-        ),
-        actions = listOf(
-          CloudflareEmailClient.RoutingRuleAction(
-            type = "forward",
-            value = listOf(destination)
-          )
-        )
-      )
-    } + CloudflareEmailClient.RoutingRule(
-      enabled = true,
-      matchers = listOf(
-        CloudflareEmailClient.RoutingRuleMatcher(
-          type = "all"
-        )
-      ),
-      actions = listOf(
-        CloudflareEmailClient.RoutingRuleAction(
-          type = "forward",
-          value = listOf(config.catchAll)
-        )
-      ),
-      priority = Int.MAX_VALUE
-    )
+    val generatedRoutingRules = config.generateRoutingRules()
+    val existingDestinationAddresses = client.listDestinationAddresses(config.account)
+    val requiredDestinationAddresses = config.collectAllAddresses().map { email ->
+      CloudflareEmailClient.DestinationAddress(email = email)
+    }
 
     val tense = if (dry) "would" else "will"
 
@@ -43,7 +16,29 @@ class ConfigurationApplier(private val client: CloudflareEmailClient, private va
     val wouldAdd = generatedRoutingRules.filter { generated ->
       !existingRoutingRules.any { existing -> generated.simpleEquals(existing) } }
 
+    val wouldAddDestinations = requiredDestinationAddresses.filter { required ->
+      !existingDestinationAddresses.any { existing ->
+        required.email == existing.email
+      }
+    }
+
     fun ruleOrRules(list: List<*>) = if (list.size == 1) "rule" else "rules"
+    fun destinationOrDestinations(list: List<*>) = if (list.size == 1) "destination" else "destinations"
+
+    println("found ${existingDestinationAddresses.size} existing destinations")
+    for (existing in existingDestinationAddresses) {
+      if (existing.verified == null) {
+        println("warning: destination ${existing.email} is not verified, emails will not be forwarded")
+      }
+    }
+    if (wouldAddDestinations.isEmpty()) {
+      println("$tense add no destinations")
+    } else {
+      println("$tense add ${wouldAddDestinations.size} ${destinationOrDestinations(wouldAddDestinations)}")
+      for (destination in wouldAddDestinations) {
+        println("  ${destination.email}")
+      }
+    }
 
     println("found ${existingRoutingRules.size} existing ${ruleOrRules(existingRoutingRules)}")
 
@@ -72,6 +67,13 @@ class ConfigurationApplier(private val client: CloudflareEmailClient, private va
     if (wouldAdd.isEmpty() && wouldRemove.isEmpty()) {
       println("nothing to be done")
       return
+    }
+
+    for (destination in wouldAddDestinations) {
+      val result = client.addDestinationAddress(config.account, destination)
+      if (!result.success) {
+        throw RuntimeException("Failed to add destination address '${destination.email}': API call failed.")
+      }
     }
 
     // From here on out, we actually handle the catch-all weirdness.
