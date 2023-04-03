@@ -2,14 +2,14 @@ package gay.pizza.gitops.cloudflare.email
 
 import kotlinx.serialization.json.Json
 
-fun CloudflareEmailClient.RoutingRule.summarize(): String {
+fun RoutingRule.summarize(): String {
   val canBeEasySummarized = matchers.size == 1 &&
     ((matchers[0].type == "literal" &&
       matchers[0].field == "to") || (matchers[0].type == "all"))
     actions.all { action -> action.type == "forward" }
 
   if (!canBeEasySummarized) {
-    return "complex rule ${Json.encodeToString(CloudflareEmailClient.RoutingRule.serializer(), this)}"
+    return "complex rule ${Json.encodeToString(RoutingRule.serializer(), this)}"
   }
 
   val destinations = actions.map { it.value }.flatten().toSet()

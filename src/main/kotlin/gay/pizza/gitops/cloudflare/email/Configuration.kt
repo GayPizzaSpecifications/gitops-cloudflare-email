@@ -12,57 +12,12 @@ data class Configuration(
   val forwards: Map<String, String> = emptyMap(),
   @SerialName("catch-all")
   val catchAll: String
-) {
-  fun generateRoutingRules(): List<CloudflareEmailClient.RoutingRule> {
-    val catchAllRule = CloudflareEmailClient.RoutingRule(
-      enabled = true,
-      matchers = listOf(
-        CloudflareEmailClient.RoutingRuleMatcher(
-          type = "all"
-        )
-      ),
-      actions = listOf(
-        CloudflareEmailClient.RoutingRuleAction(
-          type = "forward",
-          value = listOf(catchAll)
-        )
-      ),
-      priority = Int.MAX_VALUE
-    )
+)
 
-    val generatedForwardRules = forwards.map { (emailName, destination) ->
-      makeRoutingRule(emailName, listOf(destination))
-    }
+fun Configuration.collectDestinationAddresses(): List<DestinationAddress> = listOf(
+  listOf(catchAll),
+  forwards.map { forward -> forward.value },
+  groups.map { group -> group.value }.flatten()
+).flatten().toSet().toList().map { email -> DestinationAddress(email = email) }
 
-    val generatedGroupRules = groups.map { (emailName, destinations) ->
-      makeRoutingRule(emailName, destinations)
-    }
-
-    return listOf(catchAllRule) + generatedForwardRules + generatedGroupRules
-  }
-
-  private fun makeRoutingRule(emailName: String, destinations: List<String>): CloudflareEmailClient.RoutingRule {
-    return CloudflareEmailClient.RoutingRule(
-      enabled = true,
-      matchers = listOf(
-        CloudflareEmailClient.RoutingRuleMatcher(
-          type = "literal",
-          field = "to",
-          value = "${emailName}@${domain}"
-        )
-      ),
-      actions = listOf(
-        CloudflareEmailClient.RoutingRuleAction(
-          type = "forward",
-          value = destinations
-        )
-      )
-    )
-  }
-
-  fun collectAllAddresses(): List<String> = listOf(
-    listOf(catchAll),
-    forwards.map { forward -> forward.value },
-    groups.map { group -> group.value }.flatten()
-  ).flatten().toSet().toList()
-}
+fun Configuration.createDomainEmail(emailName: String): String = "${emailName}@${domain}"
