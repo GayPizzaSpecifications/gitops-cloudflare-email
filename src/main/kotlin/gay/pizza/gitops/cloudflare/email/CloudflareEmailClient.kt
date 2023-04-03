@@ -35,7 +35,7 @@ class CloudflareEmailClient(private val auth: CloudflareEmailAuth) : AutoCloseab
         rule.copy(tag = null, name = null, priority = null)))
     }.body()
 
-  suspend fun addRoutingRule(zone: String, rule: RoutingRule): ApiCallResult<List<RoutingRule>> =
+  suspend fun addRoutingRule(zone: String, rule: RoutingRule): ApiCallResult<RoutingRule> =
     httpClient.post("${baseUrl}/zones/${zone}/email/routing/rules") {
       applyAuthentication()
       setBody(Json.encodeToString(RoutingRule.serializer(), rule))
