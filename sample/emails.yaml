@@ -1,0 +1,5 @@
+domain: example.org
+zone: a3db5c13ff90a36963278c6a39e4ee3c22e2a436
+forwards:
+  hello: hello@example.com
+catch-all: catch@example.com
