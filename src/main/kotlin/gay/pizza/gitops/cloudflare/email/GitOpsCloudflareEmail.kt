@@ -30,10 +30,14 @@ class GitOpsCloudflareEmail : CliktCommand(
     .default(Path(".").absolute())
 
   override fun run() {
-    val client = CloudflareEmailClient(CloudflareEmailAuth(token = token))
-    val config = file.inputStream().use { stream -> Yaml.default.decodeFromStream(Configuration.serializer(), stream) }
-    client.use {
-      runBlocking { client.applyConfiguration(config, !apply) }
+    val config = file.inputStream().use { stream ->
+      Yaml.default.decodeFromStream(Configuration.serializer(), stream)
+    }
+
+    CloudflareEmailClient(CloudflareEmailAuth(token = token)).use { client ->
+      for (domain in config.domains) {
+        runBlocking { client.applyConfiguration(config, domain, !apply) }
+      }
     }
   }
 }

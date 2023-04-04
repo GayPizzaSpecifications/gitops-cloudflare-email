@@ -5,9 +5,7 @@ import kotlinx.serialization.Serializable
 
 @Serializable
 data class Configuration(
-  val domain: String,
-  val account: String,
-  val zone: String,
+  val domains: List<DomainConfiguration>,
   val groups: Map<String, List<String>> = emptyMap(),
   val forwards: Map<String, String> = emptyMap(),
   val workers: Map<String, String> = emptyMap(),
@@ -16,10 +14,22 @@ data class Configuration(
   val catchAll: String
 )
 
+@Serializable
+data class DomainConfiguration(
+  val domain: String,
+  val account: String,
+  val zone: String
+)
+
 fun Configuration.collectDestinationAddresses(): List<DestinationAddress> = listOf(
   listOf(catchAll),
   forwards.map { forward -> forward.value },
   groups.map { group -> group.value }.flatten()
 ).flatten().toSet().toList().map { email -> DestinationAddress(email = email) }
 
-fun Configuration.createDomainEmail(emailName: String): String = "${emailName}@${domain}"
+fun DomainConfiguration.createDomainEmail(emailName: String): String =
+  if (emailName.endsWith("@${domain}")) {
+    emailName
+  } else {
+    "${emailName}@${domain}"
+  }

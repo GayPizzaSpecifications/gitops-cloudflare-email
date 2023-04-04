@@ -167,3 +167,11 @@ data class ResultInfo(
   @SerialName("total_count")
   val totalCount: Int
 )
+
+fun ApiCallResult<*>.check(operationSummary: String) {
+  if (success) {
+    return
+  }
+
+  throw RuntimeException("Failed to $operationSummary: API call failed.")
+}

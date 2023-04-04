@@ -1,9 +1,14 @@
 package gay.pizza.gitops.cloudflare.email
 
-suspend fun CloudflareEmailClient.applyConfiguration(config: Configuration, dry: Boolean) {
-  val existingRoutingRules = listRoutingRules(config.zone)
-  val generatedRoutingRules = config.generateRoutingRules()
-  val existingDestinationAddresses = listDestinationAddresses(config.account)
+suspend fun CloudflareEmailClient.applyConfiguration(
+  config: Configuration,
+  domainConfig: DomainConfiguration,
+  dry: Boolean
+) {
+  println("generating rules for domain ${domainConfig.domain}")
+  val existingRoutingRules = listRoutingRules(domainConfig.zone)
+  val generatedRoutingRules = config.generateRoutingRules(domainConfig)
+  val existingDestinationAddresses = listDestinationAddresses(domainConfig.account)
   val requiredDestinationAddresses = config.collectDestinationAddresses()
 
   val tense = if (dry) "would" else "will"
@@ -19,8 +24,8 @@ suspend fun CloudflareEmailClient.applyConfiguration(config: Configuration, dry:
     }
   }
 
-  fun ruleOrRules(list: List<*>) = if (list.size == 1) "rule" else "rules"
-  fun destinationOrDestinations(list: List<*>) = if (list.size == 1) "destination" else "destinations"
+  fun List<*>.plurality(singular: String) =
+    if (size == 1) singular else "${singular}s"
 
   println("found ${existingDestinationAddresses.size} existing destinations")
   for (existing in existingDestinationAddresses) {
@@ -31,18 +36,18 @@ suspend fun CloudflareEmailClient.applyConfiguration(config: Configuration, dry:
   if (wouldAddDestinations.isEmpty()) {
     println("$tense add no destinations")
   } else {
-    println("$tense add ${wouldAddDestinations.size} ${destinationOrDestinations(wouldAddDestinations)}")
+    println("$tense add ${wouldAddDestinations.size} ${wouldAddDestinations.plurality("destination")}")
     for (destination in wouldAddDestinations) {
       println("  ${destination.email}")
     }
   }
 
-  println("found ${existingRoutingRules.size} existing ${ruleOrRules(existingRoutingRules)}")
+  println("found ${existingRoutingRules.size} existing ${existingRoutingRules.plurality("rule")}")
 
   if (wouldAdd.isEmpty()) {
     println("$tense add no rules")
   } else {
-    println("$tense add ${wouldAdd.size} ${ruleOrRules(wouldAdd)}:")
+    println("$tense add ${wouldAdd.size} ${wouldAdd.plurality("rule")}:")
     for (rule in wouldAdd) {
       println("  ${rule.summarize()}")
     }
@@ -51,7 +56,7 @@ suspend fun CloudflareEmailClient.applyConfiguration(config: Configuration, dry:
   if (wouldRemove.isEmpty()) {
     println("$tense remove no rules")
   } else {
-    println("$tense remove ${wouldRemove.size} ${ruleOrRules(wouldRemove)}:")
+    println("$tense remove ${wouldRemove.size} ${wouldRemove.plurality("rule")}:")
     for (rule in wouldRemove) {
       println("  ${rule.summarize()}")
     }
@@ -66,11 +71,11 @@ suspend fun CloudflareEmailClient.applyConfiguration(config: Configuration, dry:
     return
   }
 
+  println("applying email configuration for domain ${domainConfig.domain}")
+
   for (destination in wouldAddDestinations) {
-    val result = addDestinationAddress(config.account, destination)
-    if (!result.success) {
-      throw RuntimeException("Failed to add destination address '${destination.email}': API call failed.")
-    }
+    val result = addDestinationAddress(domainConfig.account, destination)
+    result.check("add destination address '${destination.email}'")
   }
 
   // From here on out, we actually handle the catch-all weirdness.
@@ -82,26 +87,22 @@ suspend fun CloudflareEmailClient.applyConfiguration(config: Configuration, dry:
   }
 
   if (catchAllRuleToAdd != null) {
-    val result = updateCatchAllRule(config.zone, catchAllRuleToAdd)
-    if (!result.success) {
-      throw RuntimeException("Failed to update catch-all rule '${catchAllRuleToAdd.summarize()}': API call failed.")
-    }
+    val result = updateCatchAllRule(domainConfig.zone, catchAllRuleToAdd)
+    result.check("update catch-all rule '${catchAllRuleToAdd.summarize()}'")
   }
 
   for (rule in wouldRemove.filter { it != catchAllRuleToRemove }) {
-    if (rule.tag == null) throw RuntimeException("Unable to delete rule '${rule.summarize()}': tag unknown")
-    val result = deleteRoutingRule(config.zone, rule.tag)
-    if (!result.success) {
-      throw RuntimeException("Failed to delete rule '${rule.summarize()}': API call failed.")
+    if (rule.tag == null) {
+      throw RuntimeException("Unable to delete rule '${rule.summarize()}': tag unknown")
     }
+    val result = deleteRoutingRule(domainConfig.zone, rule.tag)
+    result.check("delete rule '${rule.summarize()}'")
   }
 
   for (rule in wouldAdd.filter { it != catchAllRuleToAdd }) {
-    val result = addRoutingRule(config.zone, rule)
-    if (!result.success) {
-      throw RuntimeException("Failed to add rule '${rule.summarize()}': API call failed.")
-    }
+    val result = addRoutingRule(domainConfig.zone, rule)
+    result.check("add rule '${rule.summarize()}'")
   }
 
-  println("email configuration applied")
+  println("email configuration applied for domain ${domainConfig.domain}")
 }
