@@ -10,6 +10,8 @@ data class Configuration(
   val zone: String,
   val groups: Map<String, List<String>> = emptyMap(),
   val forwards: Map<String, String> = emptyMap(),
+  val workers: Map<String, String> = emptyMap(),
+  val drop: List<String> = emptyList(),
   @SerialName("catch-all")
   val catchAll: String
 )

@@ -1,6 +1,6 @@
 package gay.pizza.gitops.cloudflare.email
 
-fun RoutingRule.Companion.createForwardRule(to: String, destinations: List<String>): RoutingRule {
+fun RoutingRule.Companion.create(to: String, type: String, value: List<String>): RoutingRule {
   return RoutingRule(
     enabled = true,
     matchers = listOf(
@@ -12,9 +12,18 @@ fun RoutingRule.Companion.createForwardRule(to: String, destinations: List<Strin
     ),
     actions = listOf(
       RoutingRuleAction(
-        type = "forward",
-        value = destinations
+        type = type,
+        value = value
       )
     )
   )
 }
+
+fun RoutingRule.Companion.createForwardRule(to: String, destinations: List<String>): RoutingRule =
+  create(to, "forward", destinations)
+
+fun RoutingRule.Companion.createDropRule(to: String): RoutingRule =
+  create(to, "drop", emptyList())
+
+fun RoutingRule.Companion.createWorkerRule(to: String, workers: List<String>): RoutingRule =
+  create(to, "worker", workers)

@@ -25,5 +25,15 @@ fun Configuration.generateRoutingRules(): List<RoutingRule> {
     RoutingRule.createForwardRule(createDomainEmail(emailName), destinations)
   }
 
-  return listOf(catchAllRule) + generatedForwardRules + generatedGroupRules
+  val generatedWorkerRules = workers.map { (emailName, workerName) ->
+    RoutingRule.createWorkerRule(createDomainEmail(emailName), listOf(workerName))
+  }
+
+  val generatedDropRules = drop.map { emailName ->
+    RoutingRule.createDropRule(createDomainEmail(emailName))
+  }
+
+  return listOf(catchAllRule) + generatedForwardRules +
+    generatedGroupRules + generatedWorkerRules +
+    generatedDropRules
 }
