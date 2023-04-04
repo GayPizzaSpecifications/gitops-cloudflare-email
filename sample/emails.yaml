@@ -1,6 +1,7 @@
-domain: example.org
-account: 7448d8798a4380162d4b56f9b452e2f6f9e24e7a
-zone: a3db5c13ff90a36963278c6a39e4ee3c22e2a436
+domains:
+- domain: example.org
+  account: 7448d8798a4380162d4b56f9b452e2f6f9e24e7a
+  zone: a3db5c13ff90a36963278c6a39e4ee3c22e2a436
 groups:
   all:
   - hello@example.com
