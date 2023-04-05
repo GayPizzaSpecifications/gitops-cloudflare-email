@@ -34,7 +34,7 @@ class GitOpsCloudflareEmail : CliktCommand(
       Yaml.default.decodeFromStream(Configuration.serializer(), stream)
     }
 
-    CloudflareEmailClient(CloudflareEmailAuth(token = token)).use { client ->
+    CloudflareEmailClient(token).use { client ->
       for (domain in config.domains) {
         runBlocking { client.applyConfiguration(config, domain, !apply) }
       }

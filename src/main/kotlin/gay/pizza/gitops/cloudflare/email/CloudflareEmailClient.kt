@@ -5,11 +5,9 @@ import io.ktor.client.call.*
 import io.ktor.client.plugins.contentnegotiation.*
 import io.ktor.client.request.*
 import io.ktor.serialization.kotlinx.json.*
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
-class CloudflareEmailClient(private val auth: CloudflareEmailAuth) : AutoCloseable {
+class CloudflareEmailClient(private val token: String) : AutoCloseable {
   private val httpClient: HttpClient = HttpClient {
     install(ContentNegotiation) {
       json(Json { ignoreUnknownKeys = true })
@@ -91,87 +89,10 @@ class CloudflareEmailClient(private val auth: CloudflareEmailAuth) : AutoCloseab
   }
 
   private fun HttpRequestBuilder.applyAuthentication() {
-    if (auth.apiEmail != null) {
-      header("X-Auth-Email", auth.apiEmail)
-    }
-
-    if (auth.apiKey != null) {
-      header("X-Auth-Key", auth.apiKey)
-    }
-
-    if (auth.token != null) {
-      header("Authorization", "Bearer ${auth.token}")
-    }
+    header("Authorization", "Bearer $token")
   }
 
   override fun close() {
     httpClient.close()
   }
-}
-
-class CloudflareEmailAuth(
-  val apiEmail: String? = null,
-  val apiKey: String? = null,
-  val token: String? = null
-)
-
-@Serializable
-data class RoutingRule(
-  val name: String? = null,
-  val tag: String? = null,
-  val enabled: Boolean,
-  val matchers: List<RoutingRuleMatcher>,
-  val actions: List<RoutingRuleAction>,
-  val priority: Int? = null
-) {
-  fun simpleEquals(other: RoutingRule): Boolean = enabled == other.enabled &&
-    matchers.size == other.matchers.size &&
-    matchers.all { other.matchers.contains(it) } &&
-    actions.size == other.actions.size &&
-    actions.all { other.actions.contains(it) }
-}
-
-@Serializable
-data class RoutingRuleAction(
-  val type: String,
-  val value: List<String>
-)
-
-@Serializable
-data class RoutingRuleMatcher(
-  val type: String,
-  val field: String? = null,
-  val value: String? = null
-)
-
-@Serializable
-data class DestinationAddress(
-  val verified: String? = null,
-  val email: String
-)
-
-@Serializable
-data class ApiCallResult<T>(
-  val result: T? = null,
-  @SerialName("result_info")
-  val resultInfo: ResultInfo? = null,
-  val success: Boolean
-)
-
-@Serializable
-data class ResultInfo(
-  val count: Int,
-  val page: Int,
-  @SerialName("per_page")
-  val perPage: Int,
-  @SerialName("total_count")
-  val totalCount: Int
-)
-
-fun ApiCallResult<*>.check(operationSummary: String) {
-  if (success) {
-    return
-  }
-
-  throw RuntimeException("Failed to $operationSummary: API call failed.")
 }
