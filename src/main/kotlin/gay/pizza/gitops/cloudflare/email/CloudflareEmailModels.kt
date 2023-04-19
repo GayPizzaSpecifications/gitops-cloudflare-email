@@ -43,7 +43,21 @@ data class ApiCallResult<T>(
   val result: T? = null,
   @SerialName("result_info")
   val resultInfo: ApiCallResultInfo? = null,
+  val errors: List<ApiCallError> = listOf(),
+  val messages: List<ApiCallMessage> = listOf(),
   val success: Boolean
+)
+
+@Serializable
+data class ApiCallError(
+  val code: Int,
+  val message: String
+)
+
+@Serializable
+data class ApiCallMessage(
+  val code: Int,
+  val message: String
 )
 
 @Serializable
@@ -61,5 +75,8 @@ fun ApiCallResult<*>.check(operationSummary: String) {
     return
   }
 
-  throw RuntimeException("Failed to $operationSummary: API call failed.")
+  val errors = if (errors.isNotEmpty()) {
+    errors.joinToString(", ") { "[${it.code}] ${it.message}" }
+  } else "API call failed."
+  throw RuntimeException("Failed to $operationSummary: $errors")
 }

@@ -8,7 +8,9 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.github.ajalt.clikt.parameters.options.required
 import com.github.ajalt.clikt.parameters.types.path
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlin.io.path.Path
 import kotlin.io.path.absolute
 import kotlin.io.path.inputStream
@@ -36,8 +38,31 @@ class GitOpsCloudflareEmail : CliktCommand(
 
     CloudflareEmailClient(token).use { client ->
       for (domain in config.domains) {
-        runBlocking { client.applyConfiguration(config, domain, !apply) }
+        runBlocking {
+          handleDomainConfig(client, config, domain)
+        }
       }
     }
+  }
+
+  private suspend fun handleDomainConfig(
+    client: CloudflareEmailClient,
+    config: Configuration,
+    domainConfig: DomainConfiguration
+  ) {
+    println("[${domainConfig.domain}] generating desired state")
+    val desiredState = config.generateEmailState(domainConfig)
+    println("[${domainConfig.domain}] fetching current state")
+    val currentState = client.currentEmailState(domainConfig.account, domainConfig.zone)
+    println("[${domainConfig.domain}] planning state changes")
+    val plan = currentState.planForDesiredState(desiredState)
+    println(plan.describe(dry = !apply)
+      .trim()
+      .lineSequence()
+      .joinToString("\n") { "[${domainConfig.domain}] $it" })
+    if (!apply) {
+      return
+    }
+    client.applyConfigurationPlan(plan, domainConfig)
   }
 }

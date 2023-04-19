@@ -55,9 +55,7 @@ class CloudflareEmailClient(private val token: String) : AutoCloseable {
     var page = 1
     while (true) {
       val result = listRoutingRules(zone, page)
-      if (!result.success) {
-        throw RuntimeException("Failed to fetch routing rules.")
-      }
+      result.check("fetch routing rules page $page")
 
       if (result.result!!.isEmpty()) {
         break
@@ -74,9 +72,7 @@ class CloudflareEmailClient(private val token: String) : AutoCloseable {
     var page = 1
     while (true) {
       val result = listDestinationAddresses(zone, page)
-      if (!result.success) {
-        throw RuntimeException("Failed to fetch destination addresses.")
-      }
+      result.check("fetch destination addresses page $page")
 
       if (result.result!!.isEmpty()) {
         break
@@ -87,6 +83,11 @@ class CloudflareEmailClient(private val token: String) : AutoCloseable {
     }
     return rules
   }
+
+  suspend fun currentEmailState(account: String, zone: String): CloudflareEmailState = CloudflareEmailState(
+    routingRules = listRoutingRules(zone),
+    destinationAddresses = listDestinationAddresses(account)
+  )
 
   private fun HttpRequestBuilder.applyAuthentication() {
     header("Authorization", "Bearer $token")

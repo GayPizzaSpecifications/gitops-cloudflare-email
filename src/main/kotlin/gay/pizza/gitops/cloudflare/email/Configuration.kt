@@ -33,3 +33,8 @@ fun DomainConfiguration.createDomainEmail(emailName: String): String =
   } else {
     "${emailName}@${domain}"
   }
+
+fun Configuration.generateEmailState(domainConfig: DomainConfiguration): CloudflareEmailState = CloudflareEmailState(
+  routingRules = generateRoutingRules(domainConfig),
+  destinationAddresses = collectDestinationAddresses()
+)
